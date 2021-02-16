@@ -82,7 +82,7 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     let show = function
       | Lgt (x, n) -> x ^ " >L " ^ string_of_int n
       | Rgt (x, n) -> x ^ " >R " ^ string_of_int n
-      | Bieq (x) -> x ^ " =: " ^ x 
+      | Bieq (x) -> x ^ "bieq (" ^ x ^ ")"
   end
 
   let name () = "ni"
@@ -107,8 +107,9 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     | "setL", [(EId s1);EId s2] -> Right (Lassign (s1, int_of_string s2))
     | "incR", [(EId s1)] -> Right (Rincr s1)
     | "setR", [(EId s1);EId s2] -> Right (Rassign (s1, int_of_string s2))
-    | ">L", [(EId s1); (EId s2)] -> Left (Lgt (s1, int_of_string s2))
-    | ">R", [(EId s1); (EId s2)] -> Left (Rgt (s1, int_of_string s2))
+    | ">L",   [(EId s1); (EId s2)] -> Left (Lgt (s1, int_of_string s2))
+    | ">R",   [(EId s1); (EId s2)] -> Left (Rgt (s1, int_of_string s2))
+    | "bieq", [(EId s1)] -> Left (Bieq (s1))
     | _, _ ->
         failwith ("Cannot create theory object from (" ^ name ^ ") and parameters")
 
