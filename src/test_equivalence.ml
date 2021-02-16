@@ -1,6 +1,7 @@
 open Common
 open Kat
 open Incnat
+open Ni
 open Addition
 open Boolean
 open Product
@@ -127,6 +128,20 @@ module TestAddition (T : TESTER) = struct
          "false"      
     ]
 end
+
+module TestNI (T : TESTER) = struct
+  module TNI = T(NI)
+  open TNI
+  let tests = 
+  [
+     assert_equivalent "idempotency 1" 
+         "x >L 2"  
+         "x >L 2";
+      assert_equivalent "unrolling 3" 
+         "incL(x)*; x >L 2"  
+         "x >L 2 + incL(x)*; x >L 2"
+  ]
+  end
 
 module TestIncNat (T : TESTER) = struct
   module TI = T(IncNat)
@@ -291,6 +306,9 @@ module TestAdditionAutomata = TestAddition(AutomataTester)
 module TestIncNatNormalization = TestIncNat(NormalizationTester)
 module TestIncNatAutomata = TestIncNat(AutomataTester)
 
+module TestNINormalization = TestNI(NormalizationTester)
+module TestNIAutomata = TestNI(AutomataTester)
+
 module TestBooleanNormalization = TestBoolean(NormalizationTester)
 module TestBooleanAutomata = TestBoolean(AutomataTester)
 
@@ -299,12 +317,14 @@ module TestProductAutomata = TestProduct(AutomataTester)
                            
 let main () =
   Alcotest.run "equivalence" [
-      "addition normalization", TestAdditionNormalization.tests
+      "ni normalization", TestNINormalization.tests
+    ; "addition normalization", TestAdditionNormalization.tests
     ; "incnat normalization", TestIncNatNormalization.tests
     ; "boolean normalization", TestBooleanNormalization.tests
     ; "product normalization", TestProductNormalization.tests
     ; "addition automata", TestAdditionAutomata.tests
     ; "incnat automata", TestIncNatAutomata.tests
+    ; "ni automata", TestNIAutomata.tests
     ; "boolean automata", TestBooleanAutomata.tests
     ; "product automata", TestProductAutomata.tests
     ; "denesting normalization",

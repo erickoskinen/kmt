@@ -4,6 +4,11 @@ open Common
 open Hashcons
 open Range
 
+(* Notes: 
+     * Need to implement pushback
+     * Must use different var names for left and right program or else Z3 will treat them as the same program.
+       (this could be fixed by a global refactor of crease_z3_var)
+*)
 type a =
    | Lgt of string * int 
    | Rgt of string * int 
@@ -22,29 +27,38 @@ let compare_k x n y m =
 
 let compare_a a1 a2 =
   match (a1,a2) with
-  | Lgt(x,n),Lgt(y,m) | Rgt(x,y),Rgt(y,m) | Lgt(x,n),Rgt(y,m) | Rgt(x,y),Rgt(y,m) -> compare_k x n y m
+  | Lgt(x,n),Lgt(y,m) | Rgt(x,n),Rgt(y,m) | Lgt(x,n),Rgt(y,m) | Rgt(x,n),Lgt(y,m) -> compare_k x n y m
   | Bieq(s),Bieq(t) -> StrType.compare s t 
   | _,Bieq(_) -> -1
   | Bieq(_),_ -> 1
+  | Rgt(_,_),_ -> 1
+  | _,Rgt(_,_) -> -1
+  | Lgt(_,_),_ -> 1
+  | _,Lgt(_,_) -> -1
+
+(* Needed for Z3 var subscripting *)
+type side = Lv | Rv
+let str_of_side = function Lv -> "L" | Rv -> "R"
+let z3_var_nm str (lr:side) : string = str ^ (str_of_side lr)
+let lr_of_a a : side = 
+  match a with 
+  | Lgt(_,_) -> Lv
+  | Rgt(_,_) -> Rv
+  | Bieq(_) -> failwith "bieq in lr_of_a"
 
 let compare_p p1 p2 =
   match (p1,p2) with 
-  
-(*
+  | (Lassign(x,_),Lassign(y,_)) 
+  | (Rassign(x,_),Rassign(y,_)) 
+  | (Lincr(x),Lincr(y)) 
+  | (Rincr(x),Rincr(y)) -> StrType.compare x y
+  | (Lassign(_,_),_) -> 1
+  | (Rassign(_,_),_) -> 1
+  | (Lincr(_),_) -> -1
+  | (Rincr(_),_) -> 1
 
-let compare_p p q =
-  match (p, q) with
-  | Increment x, Increment y -> StrType.compare x y
-  | Assign (x,i), Assign (y,j) ->
-     let cmp = StrType.compare x y in
-     if cmp <> 0 then cmp
-     else i - j
-  | Increment _, Assign _ -> -1    
-  | Assign _, Increment _ -> 1
-*)
-
-module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
-  module K = KAT (IncNat)
+module rec NI : THEORY with type A.t = a and type P.t = p = struct
+  module K = KAT (NI)
   module Test = K.Test
   module Term = K.Term
 
@@ -54,8 +68,10 @@ module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
     let hash = Hashtbl.hash
     let equal = equal_p
     let show = function
-      | Increment x -> "inc (" ^ x ^ ")"
-      | Assign (x,i) -> "set (" ^ x ^ "," ^ string_of_int i ^ ")"
+      | Lincr x -> "incL (" ^ x ^ ")"
+      | Rincr x -> "incR (" ^ x ^ ")"
+      | Lassign (x,i) -> "setL (" ^ x ^ "," ^ string_of_int i ^ ")"
+      | Rassign (x,i) -> "setR (" ^ x ^ "," ^ string_of_int i ^ ")"
   end
 
   module A : CollectionType with type t = a = struct
@@ -64,46 +80,62 @@ module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
     let hash = Hashtbl.hash
     let equal = equal_a
     let show = function
-      | Gt (x, n) -> x ^ ">" ^ string_of_int n
+      | Lgt (x, n) -> x ^ " >L " ^ string_of_int n
+      | Rgt (x, n) -> x ^ " >R " ^ string_of_int n
+      | Bieq (x) -> x ^ " =: " ^ x 
   end
 
-  let name () = "incnat"
+  let name () = "ni"
   module Log = (val logger (name ()) : Logs.LOG)
                                             
-  let variable =  function
-    | Increment x -> x
-    | Assign (x,_) -> x
+(* It seems this is used by the library to get the var names. *)
 
-  let variable_test (Gt (x,_)) = x
+  let variable =  function (* EJK: Should it be different vars? *)
+    | Lincr x
+    | Lassign (x,_) -> z3_var_nm x Lv
+    | Rincr x
+    | Rassign (x,_) -> z3_var_nm x Rv
+
+  let variable_test = function (* EJK: Should it be different vars? *)
+    | Lgt (x,_) -> x
+    | Rgt (x,_) -> x
+    | Bieq (x) -> x
 
   let parse name es =
     match (name, es) with
-    | "inc", [(EId s1)] -> Right (Increment s1)
-    | "set", [(EId s1);EId s2] -> Right (Assign (s1, int_of_string s2))
-    | ">", [(EId s1); (EId s2)] -> Left (Gt (s1, int_of_string s2))
+    | "incL", [(EId s1)] -> Right (Lincr s1)
+    | "setL", [(EId s1);EId s2] -> Right (Lassign (s1, int_of_string s2))
+    | "incR", [(EId s1)] -> Right (Rincr s1)
+    | "setR", [(EId s1);EId s2] -> Right (Rassign (s1, int_of_string s2))
+    | ">L", [(EId s1); (EId s2)] -> Left (Lgt (s1, int_of_string s2))
+    | ">R", [(EId s1); (EId s2)] -> Left (Rgt (s1, int_of_string s2))
     | _, _ ->
         failwith ("Cannot create theory object from (" ^ name ^ ") and parameters")
 
   open BatSet
 
-  let push_back p a =
+  let push_back p a = failwith "push_back"
+  (*
     match (p,a) with
     | (Increment x, Gt (_, j)) when 1 > j -> PSet.singleton ~cmp:K.Test.compare (K.one ())
     | (Increment x, Gt (y, j)) when x = y ->
        PSet.singleton ~cmp:K.Test.compare (K.theory (Gt (y, j - 1)))
     | (Assign (x,i), Gt (y,j)) when x = y -> PSet.singleton ~cmp:K.Test.compare (if i > j then K.one () else K.zero ())
-    | _ -> PSet.singleton ~cmp:K.Test.compare (K.theory a)
+    | _ -> PSet.singleton ~cmp:K.Test.compare (K.theory a)*)
 
 
   let rec subterms x =
     match x with
-    | Gt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
-    | Gt (v, i) -> PSet.add (K.theory x) (subterms (Gt (v, i - 1)))
+    | Lgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
+    | Lgt (v, i) -> PSet.add (K.theory x) (subterms (Lgt (v, i - 1)))
+    | Rgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
+    | Rgt (v, i) -> PSet.add (K.theory x) (subterms (Rgt (v, i - 1)))
 
 
   let simplify_and a b =
     match (a, b) with
-    | Gt (x, v1), Gt (y, v2) when x = y -> Some (K.theory (Gt (x, max v1 v2)))
+    | Lgt (x, v1), Lgt (y, v2) when x = y -> Some (K.theory (Lgt (x, max v1 v2)))
+    | Rgt (x, v1), Rgt (y, v2) when x = y -> Some (K.theory (Rgt (x, max v1 v2)))
     | _, _ -> None
 
 
@@ -127,12 +159,18 @@ module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
     Z3.Solver.add solver [is_nat];
     xc
 
+
   let theory_to_z3_expr (a : A.t) (ctx : Z3.context) (map : Z3.Expr.expr StrMap.t) : Z3.Expr.expr = 
     match a with
-    | Gt (x, v) ->
-        let var = StrMap.find x map in
+    | Lgt (x, v)
+    | Rgt (x, v) ->
+        let var = StrMap.find (z3_var_nm x (lr_of_a a)) map in 
         let value = Z3.Arithmetic.Integer.mk_numeral_i ctx v in
         Z3.Arithmetic.mk_gt ctx var value
+    | Bieq x ->
+        let varL = StrMap.find (z3_var_nm x Lv) map in 
+        let varR = StrMap.find (z3_var_nm x Rv) map in 
+        Z3.Boolean.mk_eq ctx varL varR
 
   module H = Hashtbl.Make (K.Test)
 
@@ -168,12 +206,16 @@ module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
         in
         let rec aux (a: K.Test.t) : Range.t StrMap.t =
           match a.node with
-          | One | Zero | Placeholder _ -> failwith "IncNat: satisfiability"
+          | One | Zero | Placeholder _ -> failwith "NI: satisfiability"
           | Not b -> StrMap.map Range.negate (aux b)
           | PPar (b, c) -> mergeOp (aux b) (aux c) Range.union
           | PSeq (b, c) -> mergeOp (aux b) (aux c) Range.inter
-          | Theory Gt (x, v) ->
-              StrMap.singleton x (Range.from_range (v + 1, max_int))
+          | Theory Lgt (x, v) ->
+              StrMap.singleton (z3_var_nm x Lv) (Range.from_range (v + 1, max_int))
+          | Theory Rgt (x, v) ->
+              StrMap.singleton (z3_var_nm x Rv) (Range.from_range (v + 1, max_int))
+          | Theory Bieq (x) ->
+              failwith "aux todo"
         in
         match a.node with
         | One -> true

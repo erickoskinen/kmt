@@ -4,11 +4,13 @@ open Network
 open Product
 open Boolean
 open Incnat
+open Ni
 
 open Driver
 
 module DBoolean = Driver(Boolean)
 module DIncNat = Driver(IncNat)
+module DNI = Driver(NI)
 module DAddition = Driver(Addition)
 module DNetwork = Driver(Network)
 module DProduct = Driver(Product(Boolean)(IncNat))
@@ -36,6 +38,10 @@ let mode =
     let doc = "KMT THEORY of monotonic naturals\npredicates: x>n; actions: inc(x), set(x,n)" in
     DIncNat.run, Arg.info ["incnat"] ~doc
   in
+  let ni =
+    let doc = "KMT THEORY of bi-programs over monotonic naturals\npredicates: x >L n, x bieq x; actions: incL(x), setL(x,n)" in
+    DNI.run, Arg.info ["ni"] ~doc
+  in
   let addition =
     let doc = "KMT THEORY of naturals with more predicates\npredicates: x>n, x<n; actions: inc(x), set(x,n)" in
     DAddition.run, Arg.info ["addition"] ~doc
@@ -53,7 +59,7 @@ let mode =
     DProductAddition.run, Arg.info ["product-addition"; "aproduct"] ~doc
   in
   Arg.(last & vflag_all [DBoolean.run]
-                [boolean; incnat; addition; network; product; product_addition])
+                [boolean; incnat; ni; addition; network; product; product_addition])
 
 let args = Arg.(non_empty & pos_all string [] & info [] ~docv:"KAT term")
 
