@@ -137,6 +137,9 @@ module TestNI (T : TESTER) = struct
      assert_equivalent "idempotency 1" 
          "x >L 2"  
          "x >L 2";
+     assert_equivalent "foo" 
+         "bieq(x)"  
+         "x >L 2 + x >R 2";
       assert_equivalent "unrolling 3" 
          "incL(x)*; x >L 2"  
          "x >L 2 + incL(x)*; x >L 2"

@@ -90,16 +90,16 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
                                             
 (* It seems this is used by the library to get the var names. *)
 
-  let variable =  function (* EJK: Should it be different vars? *)
+  let variable =  function 
     | Lincr x
     | Lassign (x,_) -> z3_var_nm x Lv
     | Rincr x
     | Rassign (x,_) -> z3_var_nm x Rv
 
   let variable_test = function (* EJK: Should it be different vars? *)
-    | Lgt (x,_) -> x
-    | Rgt (x,_) -> x
-    | Bieq (x) -> x
+    | Lgt (x,_) -> z3_var_nm x Lv
+    | Rgt (x,_) -> z3_var_nm x Rv
+    | Bieq (x) -> failwith "variable_test Bieq(x)"
 
   let parse name es =
     match (name, es) with
@@ -115,7 +115,23 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
 
   open BatSet
 
-  let push_back p a = failwith "push_back"
+  let push_back p a = 
+    match (p,a) with
+    | (Lincr (_), Rgt(y,v))
+    | (Lassign (_,_), Rgt (y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v))) (* followed by Lassign... *)
+    | (Rincr (_), Lgt(y,v))
+    | (Rassign (_,_), Lgt (y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v))) (* followed by Rassign... *)
+    | (Lassign (x,v), Lgt (y,z)) 
+    | (Rassign (x,v), Rgt (y,z)) when x = y ->
+         PSet.singleton ~cmp:K.Test.compare (if v > z then K.one () else K.zero ())
+    | (Lincr (x),   Lgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
+    | (Lincr (x),   Lgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v - 1)))
+    | (Rincr (x),   Rgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
+    | (Rincr (x),   Rgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v - 1)))
+    | (Rincr (x), Bieq(y)) when  x = y -> PSet.singleton ~cmp:K.Test.compare (K.zero ())
+    | _ -> failwith "push_back"
+
+
   (*
     match (p,a) with
     | (Increment x, Gt (_, j)) when 1 > j -> PSet.singleton ~cmp:K.Test.compare (K.one ())
@@ -131,6 +147,7 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     | Lgt (v, i) -> PSet.add (K.theory x) (subterms (Lgt (v, i - 1)))
     | Rgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
     | Rgt (v, i) -> PSet.add (K.theory x) (subterms (Rgt (v, i - 1)))
+    | Bieq (v)   -> failwith "subterms"
 
 
   let simplify_and a b =
