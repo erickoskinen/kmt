@@ -55,7 +55,7 @@ module rec IncNat : THEORY with type A.t = a and type P.t = p = struct
     | Increment x -> x
     | Assign (x,_) -> x
 
-  let variable_test (Gt (x,_)) = x
+  let variable_test (Gt (x,_)) = [x]
 
   let parse name es =
     match (name, es) with

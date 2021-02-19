@@ -98,7 +98,7 @@ module rec Network : (THEORY with type A.t = field_val and type P.t = field_val)
 
   let variable x = get_field x
 
-  let variable_test x = get_field x
+  let variable_test x = [get_field x]
 
   let satisfiable x = failwith "network sat undefined"
 

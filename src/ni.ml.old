@@ -4,15 +4,20 @@ open Common
 open Hashcons
 open Range
 
+(* Notes: 
+     * Need to implement pushback
+     * Must use different var names for left and right program or else Z3 will treat them as the same program.
+       (this could be fixed by a global refactor of crease_z3_var)
+*)
 type a =
    | Lgt of string * int 
    | Rgt of string * int 
-   | Bdiff of string * int (* [[ Bdiff(x,v) ]] = (xR - xL) = v *)
+   | Bieq of string
    [@@deriving eq]
 
 type p =
-   |  Lincr of string
-   |  Rincr of string
+   | Lassign of string * int  |  Lincr of string
+   | Rassign of string * int  |  Rincr of string
    [@@deriving eq]
 
 let compare_k x n y m =
@@ -23,9 +28,9 @@ let compare_k x n y m =
 let compare_a a1 a2 =
   match (a1,a2) with
   | Lgt(x,n),Lgt(y,m) | Rgt(x,n),Rgt(y,m) | Lgt(x,n),Rgt(y,m) | Rgt(x,n),Lgt(y,m) -> compare_k x n y m
-  | Bdiff(x,n),Bdiff(y,m) -> compare_k x n y m
-  | _,(Bdiff (_,_)) -> -1
-  | Bdiff (_,_),_ -> 1
+  | Bieq(s),Bieq(t) -> StrType.compare s t 
+  | _,Bieq(_) -> -1
+  | Bieq(_),_ -> 1
   | Rgt(_,_),_ -> 1
   | _,Rgt(_,_) -> -1
   | Lgt(_,_),_ -> 1
@@ -39,14 +44,18 @@ let lr_of_a a : side =
   match a with 
   | Lgt(_,_) -> Lv
   | Rgt(_,_) -> Rv
-  | Bdiff(_,_) -> failwith "bdiff in lr_of_a"
+  | Bieq(_) -> failwith "bieq in lr_of_a"
 
 let compare_p p1 p2 =
   match (p1,p2) with 
-  | Lincr x, Lincr y 
-  | Rincr x, Rincr y -> StrType.compare x y
-  | Lincr _, Rincr _ -> -1    
-  | Rincr _, Lincr _ -> 1
+  | (Lassign(x,_),Lassign(y,_)) 
+  | (Rassign(x,_),Rassign(y,_)) 
+  | (Lincr(x),Lincr(y)) 
+  | (Rincr(x),Rincr(y)) -> StrType.compare x y
+  | (Lassign(_,_),_) -> 1
+  | (Rassign(_,_),_) -> 1
+  | (Lincr(_),_) -> -1
+  | (Rincr(_),_) -> 1
 
 module rec NI : THEORY with type A.t = a and type P.t = p = struct
   module K = KAT (NI)
@@ -61,6 +70,8 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     let show = function
       | Lincr x -> "incL (" ^ x ^ ")"
       | Rincr x -> "incR (" ^ x ^ ")"
+      | Lassign (x,i) -> "setL (" ^ x ^ "," ^ string_of_int i ^ ")"
+      | Rassign (x,i) -> "setR (" ^ x ^ "," ^ string_of_int i ^ ")"
   end
 
   module A : CollectionType with type t = a = struct
@@ -71,7 +82,7 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     let show = function
       | Lgt (x, n) -> x ^ " >L " ^ string_of_int n
       | Rgt (x, n) -> x ^ " >R " ^ string_of_int n
-      | Bdiff (x, n) -> x ^ "bdiff (" ^ x ^ "," ^ string_of_int n ^")"
+      | Bieq (x) -> x ^ "bieq (" ^ x ^ ")"
   end
 
   let name () = "ni"
@@ -80,21 +91,25 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
 (* It seems this is used by the library to get the var names. *)
 
   let variable =  function 
-    | Lincr x -> z3_var_nm x Lv
-    | Rincr x -> z3_var_nm x Rv
+    | Lincr x
+    | Lassign (x,_) -> z3_var_nm x Lv
+    | Rincr x
+    | Rassign (x,_) -> z3_var_nm x Rv
 
   let variable_test = function (* EJK: Should it be different vars? *)
-    | Lgt (x,_) -> [z3_var_nm x Lv]
-    | Rgt (x,_) -> [z3_var_nm x Rv]
-    | Bdiff (x,_) -> [z3_var_nm x Lv;z3_var_nm x Rv]
+    | Lgt (x,_) -> z3_var_nm x Lv
+    | Rgt (x,_) -> z3_var_nm x Rv
+    | Bieq (x) -> failwith "variable_test Bieq(x)"
 
   let parse name es =
     match (name, es) with
     | "incL", [(EId s1)] -> Right (Lincr s1)
+    | "setL", [(EId s1);EId s2] -> Right (Lassign (s1, int_of_string s2))
     | "incR", [(EId s1)] -> Right (Rincr s1)
-    | "gtL",   [(EId s1); (EId s2)] -> Left (Lgt (s1, int_of_string s2))
-    | "gtR",   [(EId s1); (EId s2)] -> Left (Rgt (s1, int_of_string s2))
-    | "bdiff", [(EId s1); (EId s2)] -> Left (Bdiff (s1, int_of_string s2))
+    | "setR", [(EId s1);EId s2] -> Right (Rassign (s1, int_of_string s2))
+    | ">L",   [(EId s1); (EId s2)] -> Left (Lgt (s1, int_of_string s2))
+    | ">R",   [(EId s1); (EId s2)] -> Left (Rgt (s1, int_of_string s2))
+    | "bieq", [(EId s1)] -> Left (Bieq (s1))
     | _, _ ->
         failwith ("Cannot create theory object from (" ^ name ^ ") and parameters")
 
@@ -102,17 +117,29 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
 
   let push_back p a = 
     match (p,a) with
-    | (Lincr (_), Rgt(y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v))) (* followed by Lassign... *)
-    | (Rincr (_), Lgt(y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v))) (* followed by Rassign... *)
-    | (Lincr (x), Lgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
-    | (Lincr (x), Lgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v - 1)))
-    | (Rincr (x), Rgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
-    | (Rincr (x), Rgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v - 1)))
-    | (Rincr (x), Bdiff(y,v)) when x = y -> 
-      PSet.singleton ~cmp:K.Test.compare (K.theory (Bdiff (y, v - 1)))
-    | (Lincr (x), Bdiff(y,v)) when x = y -> 
-      PSet.singleton ~cmp:K.Test.compare (K.theory (Bdiff (y, v + 1)))
+    | (Lincr (_), Rgt(y,v))
+    | (Lassign (_,_), Rgt (y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v))) (* followed by Lassign... *)
+    | (Rincr (_), Lgt(y,v))
+    | (Rassign (_,_), Lgt (y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v))) (* followed by Rassign... *)
+    | (Lassign (x,v), Lgt (y,z)) 
+    | (Rassign (x,v), Rgt (y,z)) when x = y ->
+         PSet.singleton ~cmp:K.Test.compare (if v > z then K.one () else K.zero ())
+    | (Lincr (x),   Lgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
+    | (Lincr (x),   Lgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Lgt (y, v - 1)))
+    | (Rincr (x),   Rgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
+    | (Rincr (x),   Rgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v - 1)))
+    | (Rincr (x), Bieq(y)) when  x = y -> PSet.singleton ~cmp:K.Test.compare (K.zero ())
     | _ -> failwith "push_back"
+
+
+  (*
+    match (p,a) with
+    | (Increment x, Gt (_, j)) when 1 > j -> PSet.singleton ~cmp:K.Test.compare (K.one ())
+    | (Increment x, Gt (y, j)) when x = y ->
+       PSet.singleton ~cmp:K.Test.compare (K.theory (Gt (y, j - 1)))
+    | (Assign (x,i), Gt (y,j)) when x = y -> PSet.singleton ~cmp:K.Test.compare (if i > j then K.one () else K.zero ())
+    | _ -> PSet.singleton ~cmp:K.Test.compare (K.theory a)*)
+
 
   let rec subterms x =
     match x with
@@ -120,15 +147,13 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     | Lgt (v, i) -> PSet.add (K.theory x) (subterms (Lgt (v, i - 1)))
     | Rgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
     | Rgt (v, i) -> PSet.add (K.theory x) (subterms (Rgt (v, i - 1)))
-    | Bdiff (v, _) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
-    (* Since Bdiff is exact, we don't need subterms like this:
-    | Bdiff (v, i) -> PSet.add (K.theory x) (subterms (Bdiff (v, i - 1))) *)
-    
+    | Bieq (v)   -> failwith "subterms"
+
+
   let simplify_and a b =
     match (a, b) with
     | Lgt (x, v1), Lgt (y, v2) when x = y -> Some (K.theory (Lgt (x, max v1 v2)))
     | Rgt (x, v1), Rgt (y, v2) when x = y -> Some (K.theory (Rgt (x, max v1 v2)))
-    | Bdiff (x, v1), Bdiff (y, v2) when x = y && v1 = v2 -> Some (K.theory (Bdiff (x, v1)))
     | _, _ -> None
 
 
@@ -160,12 +185,10 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
         let var = StrMap.find (z3_var_nm x (lr_of_a a)) map in 
         let value = Z3.Arithmetic.Integer.mk_numeral_i ctx v in
         Z3.Arithmetic.mk_gt ctx var value
-    | Bdiff (x,v) ->
+    | Bieq x ->
         let varL = StrMap.find (z3_var_nm x Lv) map in 
         let varR = StrMap.find (z3_var_nm x Rv) map in 
-        let df = Z3.Arithmetic.mk_sub ctx [varR;varL] in (* exact *)
-        let value = Z3.Arithmetic.Integer.mk_numeral_i ctx v in
-        Z3.Boolean.mk_eq ctx df value
+        Z3.Boolean.mk_eq ctx varL varR
 
   module H = Hashtbl.Make (K.Test)
 

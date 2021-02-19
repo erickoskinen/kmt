@@ -90,7 +90,7 @@ module type THEORY = sig
   val merge : P.t -> P.t -> P.t
   val reduce : A.t -> P.t -> P.t option
   val variable : P.t -> string
-  val variable_test : A.t -> string
+  val variable_test : A.t -> string list
   val unbounded : unit -> bool
   val satisfiable : Test.t -> bool
   val create_z3_var: string * A.t -> Z3.context -> Z3.Solver.solver -> Z3.Expr.expr
@@ -401,7 +401,9 @@ module KAT (T : THEORY) : KAT_IMPL with module A = T.A and module P = T.P = stru
     | Not b -> all_variables b
     | PPar (b, c) | PSeq (b, c) ->
         StrMap.union (fun k v1 v2 -> Some v1) (all_variables b) (all_variables c)
-    | Theory x -> StrMap.singleton (T.variable_test x) x
+    | Theory x -> 
+       let tvars = T.variable_test x in
+       StrMap.of_seq (List.to_seq (List.map (fun tv -> (tv,x)) tvars) )
 
   let z3_satisfiable (a: Test.t) =
     let rec sat_aux (a: Test.t) ctx map =
@@ -431,6 +433,7 @@ module KAT (T : THEORY) : KAT_IMPL with module A = T.A and module P = T.P = stru
     (* recrusively generate the formula and assert it *)
     let formula = sat_aux a ctx map in
     Solver.add solver [formula] ;
+    print_endline (Solver.to_string solver);
     let status = Solver.check solver [] in
     Solver.reset solver ;
     status = Solver.SATISFIABLE

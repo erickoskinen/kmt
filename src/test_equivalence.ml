@@ -136,7 +136,7 @@ module TestNI (T : TESTER) = struct
   [
      assert_equivalent "idempotency 1" 
          "x >L 2"  
-         "x >L 2";
+         "x asdf 2";
      assert_equivalent "foo" 
          "bieq(x)"  
          "x >L 2 + x >R 2";
@@ -320,14 +320,14 @@ module TestProductAutomata = TestProduct(AutomataTester)
                            
 let main () =
   Alcotest.run "equivalence" [
-      "ni normalization", TestNINormalization.tests
+      "ni automata", TestNIAutomata.tests
+    ; "ni normalization", TestNINormalization.tests
     ; "addition normalization", TestAdditionNormalization.tests
     ; "incnat normalization", TestIncNatNormalization.tests
     ; "boolean normalization", TestBooleanNormalization.tests
     ; "product normalization", TestProductNormalization.tests
     ; "addition automata", TestAdditionAutomata.tests
     ; "incnat automata", TestIncNatAutomata.tests
-    ; "ni automata", TestNIAutomata.tests
     ; "boolean automata", TestBooleanAutomata.tests
     ; "product automata", TestProductAutomata.tests
     ; "denesting normalization",

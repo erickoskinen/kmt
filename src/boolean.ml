@@ -51,7 +51,7 @@ module rec Boolean : THEORY with type A.t = a and type P.t = p = struct
               
   let variable = get_name_p
 
-  let variable_test = get_name_a
+  let variable_test a = [get_name_a a]
 
   let get_bool s = 
     match s with
