@@ -109,9 +109,9 @@ module rec NI : THEORY with type A.t = a and type P.t = p = struct
     | (Rincr (x), Rgt (y,v)) when 1 > v -> PSet.singleton ~cmp:K.Test.compare (K.one ())
     | (Rincr (x), Rgt (y,v)) when x = y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v - 1)))
     | (Rincr (x), Bdiff(y,v)) when x = y -> 
-      PSet.singleton ~cmp:K.Test.compare (K.theory (Bdiff (y, v - 1)))
-    | (Lincr (x), Bdiff(y,v)) when x = y -> 
       PSet.singleton ~cmp:K.Test.compare (K.theory (Bdiff (y, v + 1)))
+    | (Lincr (x), Bdiff(y,v)) when x = y -> 
+      PSet.singleton ~cmp:K.Test.compare (K.theory (Bdiff (y, v - 1)))
     | _ -> failwith "push_back"
 
   let rec subterms x =
