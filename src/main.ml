@@ -5,14 +5,14 @@ open Product
 open Boolean
 open Incnat
 open Ni
-open Coqkat
+open Coqnat
 
 open Driver
 
 module DBoolean = Driver(Boolean)
 module DIncNat = Driver(IncNat)
 module DNI = Driver(NI)
-module DCoqKat = Driver(CoqKat)
+module DCoqNat = Driver(CoqNat)
 module DAddition = Driver(Addition)
 module DNetwork = Driver(Network)
 module DProduct = Driver(Product(Boolean)(IncNat))
@@ -44,9 +44,9 @@ let mode =
     let doc = "KMT THEORY of bi-programs over monotonic naturals\npredicates: x >L n, x bieq x; actions: incL(x), setL(x,n)" in
     DNI.run, Arg.info ["ni"] ~doc
   in
-  let coqkat =
-    let doc = "KMT THEORY extracted from Coq\npredicates: x >L n, x bieq x; actions: incL(x), setL(x,n)" in
-    DCoqKat.run, Arg.info ["coqkat"] ~doc
+  let coqnat =
+    let doc = "KMT THEORY extracted from Coq\npredicates: ... todo ... " in
+    DCoqNat.run, Arg.info ["coqnat"] ~doc
   in
   let addition =
     let doc = "KMT THEORY of naturals with more predicates\npredicates: x>n, x<n; actions: inc(x), set(x,n)" in
