@@ -229,8 +229,35 @@ open BatSet
         end
       else begin
         Log.debug (fun m -> m "%s taking FAST path" (K.Test.show a)) ;
-        failwith "ni FAST path unimplemented"
-      end
+        let mergeOp map1 map2 op =
+          StrMap.merge
+            (fun _ v1 v2 ->
+              match (v1, v2) with
+              | None, _ -> v2
+              | _, None -> v1
+              | Some x, Some y -> Some (op x y) )
+            map1 map2
+        in
+        let rec aux (a: K.Test.t) : Range.t StrMap.t =
+          match a.node with
+          | One | Zero | Placeholder _ -> failwith "IncNat: satisfiability"
+          | Not b -> StrMap.map Range.negate (aux b)
+          | PPar (b, c) -> mergeOp (aux b) (aux c) Range.union
+          | PSeq (b, c) -> mergeOp (aux b) (aux c) Range.inter
+          | Theory Gt (x, v) ->
+              StrMap.singleton x (Range.from_range (v + 1, max_int))
+        in
+        match a.node with
+        | One -> true
+        | Zero -> false
+        | _ ->
+            let result = aux a in
+            let ret =
+              StrMap.for_all (fun _ r -> not (Range.is_false r)) result
+            in
+            (* Printf.printf "Actual Result: %b\n" ret; *)
+            H.add tbl a ret ; ret
+        end
       *)
 end
 
