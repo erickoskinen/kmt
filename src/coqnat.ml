@@ -146,7 +146,8 @@ open BatSet
     | _ -> failwith "push_back"
 *)
 
-  let rec subterms x = failwith "subterms"
+  let rec subterms x =
+    PSet.of_list ~cmp:K.Test.compare (List.map K.theory (Coq.subt x))
 (*
   match x with
     | Lgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
