@@ -131,7 +131,11 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
 
 open BatSet
 
-  let push_back p a = failwith "push_back"
+  let push_back p a =
+    match (p, a) with
+    | (x, Coq.PTgt (_, j)) when j < 1 -> PSet.singleton ~cmp:K.Test.compare (K.one ()) (* {True} x++ {_ > 0} *)
+    | (x, Coq.PTgt (y, j)) when Coq.eqb x y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Coq.PTgt (y, j - 1))) (* {y > j - 1} y++ {y > j}*)
+    | _ -> PSet.singleton ~cmp:K.Test.compare (K.theory a)
 (*
   match (p,a) with
     | (Lincr (_), Rgt(y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v))) (* followed by Lassign... *)
