@@ -57,10 +57,11 @@ let p_pre' t a =
 (** val subt_gt : char list -> int -> pTest list **)
 
 let rec subt_gt v i =
-  (fun zero succ n ->       if n=0 then zero () else succ (n-1))
+  (* (fun zero succ n ->       if n=0 then zero () else succ (n-1))
     (fun _ -> (PTgt (v, 0))::[])
     (fun n -> (PTgt (v, n))::(subt_gt v n))
-    i
+    i *)
+  PTgt (v, i)::(if i = 0 then [] else subt_gt v (i - 1))
 
 (** val subt : pTest -> pTest list **)
 
