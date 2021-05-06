@@ -159,7 +159,10 @@ open BatSet
     | Bdiff (v, i) -> PSet.add (K.theory x) (subterms (Bdiff (v, i - 1))) *)
     *)
 
-  let simplify_and a b = failwith "simplify_and"
+  let simplify_and a b =
+    match (a, b) with
+    | Coq.PTgt(x, v1), Coq.PTgt(y, v2) when Coq.eqb x y -> Some (K.theory (Coq.PTgt (x, max v1 v2)))
+    | _ -> None
 (*
     match (a, b) with
     | Lgt (x, v1), Lgt (y, v2) when x = y -> Some (K.theory (Lgt (x, max v1 v2)))
