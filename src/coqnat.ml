@@ -172,7 +172,10 @@ open BatSet
 
   let simplify_not a = None
 
-  let simplify_or a b = None
+  let simplify_or a b =
+    match (a, b) with
+    | Coq.PTgt(x, v1), Coq.PTgt(y, v2) when Coq.eqb x y -> Some (K.theory (Coq.PTgt (x, min v1 v2)))
+    | _ -> None
 
   let merge (p1: P.t) (p2: P.t) : P.t = p2
 
