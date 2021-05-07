@@ -65,7 +65,7 @@ let mode =
     DProductAddition.run, Arg.info ["product-addition"; "aproduct"] ~doc
   in
   Arg.(last & vflag_all [DBoolean.run]
-                [boolean; incnat; ni; addition; network; product; product_addition])
+                [boolean; incnat; ni; coqnat; addition; network; product; product_addition])
 
 let args = Arg.(non_empty & pos_all string [] & info [] ~docv:"KAT term")
 

@@ -202,8 +202,6 @@ open BatSet
   let unbounded () = true
 
   let create_z3_var (str,a) (ctx : Z3.context) (solver : Z3.Solver.solver) : Z3.Expr.expr = 
-     failwith "create_z3_var"
-    (*
     let sym = Z3.Symbol.mk_string ctx str in
     let int_sort = Z3.Arithmetic.Integer.mk_sort ctx in
     let xc = Z3.Expr.mk_const ctx sym int_sort in
@@ -213,27 +211,15 @@ open BatSet
     Z3.Solver.add solver [is_nat];
     xc
 
-*)
   let theory_to_z3_expr (a : A.t) (ctx : Z3.context) (map : Z3.Expr.expr StrMap.t) : Z3.Expr.expr = 
-     failwith "theory_to_z3_expr"
-    (*
     match a with
-    | Lgt (x, v)
-    | Rgt (x, v) ->
-        let var = StrMap.find (z3_var_nm x (lr_of_a a)) map in 
+    | Coq.PTgt (xcl, v) ->
+        let x = string_of_charl xcl in
+        let var = StrMap.find x map in 
         let value = Z3.Arithmetic.Integer.mk_numeral_i ctx v in
         Z3.Arithmetic.mk_gt ctx var value
-    | Bdiff (x,v) ->
-        let varL = StrMap.find (z3_var_nm x Lv) map in 
-        let varR = StrMap.find (z3_var_nm x Rv) map in 
-        let df = Z3.Arithmetic.mk_sub ctx [varR;varL] in (* exact *)
-        let value = Z3.Arithmetic.Integer.mk_numeral_i ctx v in
-        Z3.Boolean.mk_eq ctx df value
 
-  module H = Hashtbl.Make (K.Test)
-
-  let tbl = H.create 2048
-
+        (*
   let rec can_use_fast_solver (a: K.Test.t) =
     match a.node with
     | One | Zero | Placeholder _ | Theory _ -> true
@@ -242,7 +228,13 @@ open BatSet
     | Not {node= Theory _} -> true
     | Not _ -> false
 *)
-  let satisfiable (a: K.Test.t) = failwith "sat"
+  module H = Hashtbl.Make (K.Test)
+  let tbl = H.create 2048
+
+  let satisfiable (a: K.Test.t) = 
+    Log.debug (fun m -> m "%s taking SLOW path" (K.Test.show a));
+    let ret = K.z3_satisfiable a in
+    H.add tbl a ret ; ret
 (*
     try H.find tbl a with _ ->
       if true (* not (can_use_fast_solver a) *)
