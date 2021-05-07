@@ -132,6 +132,8 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     match (name,es) with 
     | "gt", [(EId s1); (EId s2)] -> Left (Coq.PTgt (charl_of_string s1, int_of_string s2))
     | "inc", [(EId s1)] -> Right  (charl_of_string s1)
+    | _ ->
+      failwith ("Cannot create theory object from (" ^ name ^ ") and parameters")
 (*    match (name, es) with
     | "incL", [(EId s1)] -> Right (Lincr s1)
     | "incR", [(EId s1)] -> Right (Rincr s1)
