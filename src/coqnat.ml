@@ -106,21 +106,25 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
   module Log = (val logger (name ()) : Logs.LOG)
                                             
 (* It seems this is used by the library to get the var names. *)
+  let string_of_charl l = String.of_seq (List.to_seq l)
 
-  let variable p = String.of_seq (List.to_seq p)
+  let variable p = string_of_charl p
  (* function 
     | Lincr x -> z3_var_nm x Lv
     | Rincr x -> z3_var_nm x Rv*)
 
   let variable_test =
     function
-    | Coq.PTgt (x, _) -> [String.of_seq (List.to_seq x)]
+    | Coq.PTgt (x, _) -> [string_of_charl x]
   (* function (* EJK: Should it be different vars? *)
     | Lgt (x,_) -> [z3_var_nm x Lv]
     | Rgt (x,_) -> [z3_var_nm x Rv]
     | Bdiff (x,_) -> [z3_var_nm x Lv;z3_var_nm x Rv]*)
 
   let parse name es = failwith "parse"
+  match (name,es) with 
+  | "gt", [(EId s1); (EId s2)] -> Coq.PTgt (String.to_seq s1, int_of_string s2)
+  | "inc", [(EId s1)] -> Coq.pAct (String.to_seq s1)
 (*    match (name, es) with
     | "incL", [(EId s1)] -> Right (Lincr s1)
     | "incR", [(EId s1)] -> Right (Rincr s1)
