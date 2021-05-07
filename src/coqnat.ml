@@ -4,11 +4,17 @@ open Syntax
 
 open String
 open Nat
+
+let string_of_charl l = String.of_seq (List.to_seq l)
+let charl_of_string s = List.of_seq (String.to_seq s)
+
 module Coq = struct
   (* Extracted from Coq *)
   (* ****************************************************************** *)
 
 (** val sub : int -> int -> int **)
+
+
 
 let rec sub n m =
   (fun zero succ n ->       if n=0 then zero () else succ (n-1))
@@ -42,10 +48,11 @@ type 'bp texp =
 
 type pTest =
 | PTgt of char list * int
+[@@deriving eq]
 
 type pAct = char list
+[@@deriving eq]
   (* singleton inductive, whose constructor was pAinc *)
-
 (** val p_pre' : pTest -> pAct -> pTest texp list **)
 
 let p_pre' t a =
@@ -68,21 +75,26 @@ let rec subt_gt v i =
 let subt = function
 | PTgt (v, i) -> subt_gt v i
 
-
 end
-
 
 (* A Kat Module, built from the Coq extracted Module *)
 
 (* Mike's a = Dave's pTest. *)
 (* Mike's p = Dave's pAct.  *)
-let rec compare_p (p:Coq.pAct) = failwith "compare_p"
-let rec compare_a (a:Coq.pTest) = failwith "compare_a"
+let rec compare_p (p1:Coq.pAct) (p2:Coq.pAct) = 
+  String.compare (string_of_charl p1) (string_of_charl p2)
+
+let rec compare_a (a1:Coq.pTest) (a2:Coq.pTest) =
+   match (a1,a2) with
+   | Coq.PTgt(x,i), Coq.PTgt(y,j) ->
+    let cmp = StrType.compare (string_of_charl x) (string_of_charl y) in
+    if cmp <> 0 then cmp
+    else i - j
+
+    (*
 let rec equal_p (p:Coq.pAct) = failwith "equal_p"
 let rec equal_a (a:Coq.pTest) = failwith "equal_a"
-
-let string_of_charl l = String.of_seq (List.to_seq l)
-let charl_of_string s = List.of_seq (String.to_seq s)
+*)
 
 (*
 type pTest =
@@ -97,7 +109,7 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     type t = Coq.pAct
     let compare = compare_p
     let hash = Hashtbl.hash
-    let equal = equal_p
+    let equal = Coq.equal_pAct
     let show = fun cl -> "Coq.pAct (" ^ (string_of_charl cl) ^ ")"
   end
 
@@ -105,7 +117,7 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     type t = Coq.pTest
     let compare = compare_a
     let hash = Hashtbl.hash
-    let equal = equal_a
+    let equal = Coq.equal_pTest
     let show = function
     | Coq.PTgt (x, y) -> "incCoq.PTgtL (" ^ (string_of_charl x) ^ "," ^ (string_of_int y) ^ ")"
   end
