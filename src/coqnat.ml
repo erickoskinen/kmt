@@ -57,10 +57,11 @@ let p_pre' t a =
 (** val subt_gt : char list -> int -> pTest list **)
 
 let rec subt_gt v i =
-  (fun zero succ n ->       if n=0 then zero () else succ (n-1))
+  (* (fun zero succ n ->       if n=0 then zero () else succ (n-1))
     (fun _ -> (PTgt (v, 0))::[])
     (fun n -> (PTgt (v, n))::(subt_gt v n))
-    i
+    i *)
+  PTgt (v, i)::(if i = 0 then [] else subt_gt v (i - 1))
 
 (** val subt : pTest -> pTest list **)
 
@@ -106,12 +107,14 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
                                             
 (* It seems this is used by the library to get the var names. *)
 
-  let variable =  failwith "variable"
+  let variable p = String.of_seq (List.to_seq p)
  (* function 
     | Lincr x -> z3_var_nm x Lv
     | Rincr x -> z3_var_nm x Rv*)
 
-  let variable_test = failwith "variable_test"
+  let variable_test =
+    function
+    | Coq.PTgt (x, _) -> [String.of_seq (List.to_seq x)]
   (* function (* EJK: Should it be different vars? *)
     | Lgt (x,_) -> [z3_var_nm x Lv]
     | Rgt (x,_) -> [z3_var_nm x Rv]
@@ -130,7 +133,11 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
 
 open BatSet
 
-  let push_back p a = failwith "push_back"
+  let push_back p a =
+    match (p, a) with
+    | (x, Coq.PTgt (_, j)) when j < 1 -> PSet.singleton ~cmp:K.Test.compare (K.one ()) (* {True} x++ {_ > 0} *)
+    | (x, Coq.PTgt (y, j)) when Coq.eqb x y -> PSet.singleton ~cmp:K.Test.compare (K.theory (Coq.PTgt (y, j - 1))) (* {y > j - 1} y++ {y > j}*)
+    | _ -> PSet.singleton ~cmp:K.Test.compare (K.theory a)
 (*
   match (p,a) with
     | (Lincr (_), Rgt(y,v)) -> PSet.singleton ~cmp:K.Test.compare (K.theory (Rgt (y, v))) (* followed by Lassign... *)
@@ -146,7 +153,8 @@ open BatSet
     | _ -> failwith "push_back"
 *)
 
-  let rec subterms x = failwith "subterms"
+  let rec subterms x =
+    PSet.of_list ~cmp:K.Test.compare (List.map K.theory (Coq.subt x))
 (*
   match x with
     | Lgt (_, 0) -> PSet.singleton ~cmp:K.Test.compare (K.theory x)
@@ -158,7 +166,10 @@ open BatSet
     | Bdiff (v, i) -> PSet.add (K.theory x) (subterms (Bdiff (v, i - 1))) *)
     *)
 
-  let simplify_and a b = failwith "simplify_and"
+  let simplify_and a b =
+    match (a, b) with
+    | Coq.PTgt(x, v1), Coq.PTgt(y, v2) when Coq.eqb x y -> Some (K.theory (Coq.PTgt (x, max v1 v2)))
+    | _ -> None
 (*
     match (a, b) with
     | Lgt (x, v1), Lgt (y, v2) when x = y -> Some (K.theory (Lgt (x, max v1 v2)))
@@ -168,7 +179,10 @@ open BatSet
 
   let simplify_not a = None
 
-  let simplify_or a b = None
+  let simplify_or a b =
+    match (a, b) with
+    | Coq.PTgt(x, v1), Coq.PTgt(y, v2) when Coq.eqb x y -> Some (K.theory (Coq.PTgt (x, min v1 v2)))
+    | _ -> None
 
   let merge (p1: P.t) (p2: P.t) : P.t = p2
 
