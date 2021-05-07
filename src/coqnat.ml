@@ -107,12 +107,14 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
                                             
 (* It seems this is used by the library to get the var names. *)
 
-  let variable =  failwith "variable"
+  let variable p = String.of_seq (List.to_seq p)
  (* function 
     | Lincr x -> z3_var_nm x Lv
     | Rincr x -> z3_var_nm x Rv*)
 
-  let variable_test = failwith "variable_test"
+  let variable_test =
+    function
+    | Coq.PTgt (x, _) -> [String.of_seq (List.to_seq x)]
   (* function (* EJK: Should it be different vars? *)
     | Lgt (x,_) -> [z3_var_nm x Lv]
     | Rgt (x,_) -> [z3_var_nm x Rv]
