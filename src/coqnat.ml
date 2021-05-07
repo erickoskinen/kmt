@@ -81,6 +81,13 @@ let rec compare_a (a:Coq.pTest) = failwith "compare_a"
 let rec equal_p (p:Coq.pAct) = failwith "equal_p"
 let rec equal_a (a:Coq.pTest) = failwith "equal_a"
 
+let string_of_charl l = String.of_seq (List.to_seq l)
+let charl_of_string s = List.of_seq (String.to_seq s)
+
+(*
+type pTest =
+| PTgt of char list * int
+type pAct = char list *)
 module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = struct
   module K = KAT (CoqNat)
   module Test = K.Test
@@ -91,7 +98,7 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     let compare = compare_p
     let hash = Hashtbl.hash
     let equal = equal_p
-    let show = failwith "TODO:show P"
+    let show = fun cl -> "Coq.pAct (" ^ (string_of_charl cl) ^ ")"
   end
 
   module A : CollectionType with type t = Coq.pTest = struct
@@ -99,14 +106,14 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     let compare = compare_a
     let hash = Hashtbl.hash
     let equal = equal_a
-    let show = failwith "TODO:show A"
+    let show = function
+    | Coq.PTgt (x, y) -> "incCoq.PTgtL (" ^ (string_of_charl x) ^ "," ^ (string_of_int y) ^ ")"
   end
 
   let name () = "coqnat"
   module Log = (val logger (name ()) : Logs.LOG)
                                             
 (* It seems this is used by the library to get the var names. *)
-  let string_of_charl l = String.of_seq (List.to_seq l)
 
   let variable p = string_of_charl p
  (* function 
@@ -121,10 +128,10 @@ module rec CoqNat : THEORY with type A.t = Coq.pTest and type P.t = Coq.pAct = s
     | Rgt (x,_) -> [z3_var_nm x Rv]
     | Bdiff (x,_) -> [z3_var_nm x Lv;z3_var_nm x Rv]*)
 
-  let parse name es = failwith "parse"
-  match (name,es) with 
-  | "gt", [(EId s1); (EId s2)] -> Coq.PTgt (String.to_seq s1, int_of_string s2)
-  | "inc", [(EId s1)] -> Coq.pAct (String.to_seq s1)
+  let parse name es = 
+    match (name,es) with 
+    | "gt", [(EId s1); (EId s2)] -> Left (Coq.PTgt (charl_of_string s1, int_of_string s2))
+    | "inc", [(EId s1)] -> Right  (charl_of_string s1)
 (*    match (name, es) with
     | "incL", [(EId s1)] -> Right (Lincr s1)
     | "incR", [(EId s1)] -> Right (Rincr s1)
